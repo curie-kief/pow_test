@@ -16,6 +16,7 @@
 #define HAS_INTEL_HW
 #endif
 #ifdef _MSC_VER
+#include <malloc.h> 
 #include <intrin.h>
 #define HAS_INTEL_HW
 #endif
@@ -85,14 +86,24 @@ class cn_slow_hash
 public:
 	cn_slow_hash()
 	{
+#if !defined(_MSC_VER)
 		lpad.as_void = aligned_alloc(4096, MEMORY);
 		spad.as_void = aligned_alloc(4096, 4096);
+#else
+		lpad.as_void = _aligned_malloc(MEMORY, 4096);
+		spad.as_void = _aligned_malloc(4096, 4096);
+#endif
 	}
 
 	~cn_slow_hash()
 	{
+#if !defined(_MSC_VER)
 		free(lpad.as_void);
 		free(spad.as_void);
+#else
+		_aligned_free(lpad.as_void);
+		_aligned_free(spad.as_void);
+#endif		
 	}
 
 	void hash(const void* in, size_t len, void* out)

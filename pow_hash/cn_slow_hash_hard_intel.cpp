@@ -73,10 +73,18 @@ inline void aes_round8(const __m128i& key, __m128i& x0, __m128i& x1, __m128i& x2
 	x7 = _mm_aesenc_si128(x7, key);
 }
 
+inline void aes_round4(const __m128i& key, __m128i& x0, __m128i& x1, __m128i& x2, __m128i& x3)
+{
+	x0 = _mm_aesenc_si128(x0, key);
+	x1 = _mm_aesenc_si128(x1, key);
+	x2 = _mm_aesenc_si128(x2, key);
+	x3 = _mm_aesenc_si128(x3, key);
+}
+
 template<size_t MEMORY, size_t ITER>
 void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_hard()
 {
-	__m128i x0, x1, x2, x3, x4, x5, x6, x7;
+	__m128i x0, x1, x2, x3;
 	__m128i k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
 	
 	aes_genkey(spad.as_xmm + 2, k0, k1, k2, k3, k4, k5, k6, k7, k8, k9);
@@ -85,10 +93,6 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_hard()
 	x1 = _mm_load_si128(spad.as_xmm + 5);
 	x2 = _mm_load_si128(spad.as_xmm + 6);
 	x3 = _mm_load_si128(spad.as_xmm + 7);
-	x4 = _mm_load_si128(spad.as_xmm + 8);
-	x5 = _mm_load_si128(spad.as_xmm + 9);
-	x6 = _mm_load_si128(spad.as_xmm + 10);
-	x7 = _mm_load_si128(spad.as_xmm + 11);
 
 	for (size_t i = 0; i < MEMORY / sizeof(__m128i); i +=8)
 	{
@@ -96,37 +100,58 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_hard()
 		x1 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 1), x1);
 		x2 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 2), x2);
 		x3 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 3), x3);
-		x4 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 4), x4);
-		x5 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 5), x5);
-		x6 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 6), x6);
-		x7 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 7), x7);
 
-		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k2, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k3, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k4, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k5, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k6, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round4(k0, x0, x1, x2, x3);
+		aes_round4(k1, x0, x1, x2, x3);
+		aes_round4(k2, x0, x1, x2, x3);
+		aes_round4(k3, x0, x1, x2, x3);
+		aes_round4(k4, x0, x1, x2, x3);
+		aes_round4(k5, x0, x1, x2, x3);
+		aes_round4(k6, x0, x1, x2, x3);
+		aes_round4(k7, x0, x1, x2, x3);
+		aes_round4(k8, x0, x1, x2, x3);
+		aes_round4(k9, x0, x1, x2, x3);
 	}
 
 	_mm_store_si128(spad.as_xmm + 4, x0);
 	_mm_store_si128(spad.as_xmm + 5, x1);
 	_mm_store_si128(spad.as_xmm + 6, x2);
 	_mm_store_si128(spad.as_xmm + 7, x3);
-	_mm_store_si128(spad.as_xmm + 8, x4);
-	_mm_store_si128(spad.as_xmm + 9, x5);
-	_mm_store_si128(spad.as_xmm + 10, x6);
-	_mm_store_si128(spad.as_xmm + 11, x7);
+	
+	x0 = _mm_load_si128(spad.as_xmm + 8);
+	x1 = _mm_load_si128(spad.as_xmm + 9);
+	x2 = _mm_load_si128(spad.as_xmm + 10);
+	x3 = _mm_load_si128(spad.as_xmm + 11);
+	
+	for (size_t i = 4; i < MEMORY / sizeof(__m128i); i +=8)
+	{
+		x0 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 4), x0);
+		x1 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 5), x1);
+		x2 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 6), x2);
+		x3 = _mm_xor_si128(_mm_load_si128(lpad.as_xmm + i + 7), x3);
+
+		aes_round4(k0, x0, x1, x2, x3);
+		aes_round4(k1, x0, x1, x2, x3);
+		aes_round4(k2, x0, x1, x2, x3);
+		aes_round4(k3, x0, x1, x2, x3);
+		aes_round4(k4, x0, x1, x2, x3);
+		aes_round4(k5, x0, x1, x2, x3);
+		aes_round4(k6, x0, x1, x2, x3);
+		aes_round4(k7, x0, x1, x2, x3);
+		aes_round4(k8, x0, x1, x2, x3);
+		aes_round4(k9, x0, x1, x2, x3);
+	}
+
+	_mm_store_si128(spad.as_xmm + 8, x0);
+	_mm_store_si128(spad.as_xmm + 9, x1);
+	_mm_store_si128(spad.as_xmm + 10, x2);
+	_mm_store_si128(spad.as_xmm + 11, x3);
 }
 
 template<size_t MEMORY, size_t ITER>
 void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_hard()
 {
-	__m128i x0, x1, x2, x3, x4, x5, x6, x7;
+	__m128i x0, x1, x2, x3;
 	__m128i k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
 
 	aes_genkey(spad.as_xmm, k0, k1, k2, k3, k4, k5, k6, k7, k8, k9);
@@ -135,32 +160,48 @@ void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_hard()
 	x1 = _mm_load_si128(spad.as_xmm + 5);
 	x2 = _mm_load_si128(spad.as_xmm + 6);
 	x3 = _mm_load_si128(spad.as_xmm + 7);
-	x4 = _mm_load_si128(spad.as_xmm + 8);
-	x5 = _mm_load_si128(spad.as_xmm + 9);
-	x6 = _mm_load_si128(spad.as_xmm + 10);
-	x7 = _mm_load_si128(spad.as_xmm + 11);
 
 	for(size_t i = 0; i < MEMORY / sizeof(__m128i); i += 8)
 	{
-		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k2, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k3, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k4, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k5, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k6, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
-		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round4(k0, x0, x1, x2, x3);
+		aes_round4(k1, x0, x1, x2, x3);
+		aes_round4(k2, x0, x1, x2, x3);
+		aes_round4(k3, x0, x1, x2, x3);
+		aes_round4(k4, x0, x1, x2, x3);
+		aes_round4(k5, x0, x1, x2, x3);
+		aes_round4(k6, x0, x1, x2, x3);
+		aes_round4(k7, x0, x1, x2, x3);
+		aes_round4(k8, x0, x1, x2, x3);
+		aes_round4(k9, x0, x1, x2, x3);
 
 		_mm_store_si128(lpad.as_xmm + i + 0, x0);
 		_mm_store_si128(lpad.as_xmm + i + 1, x1);
 		_mm_store_si128(lpad.as_xmm + i + 2, x2);
 		_mm_store_si128(lpad.as_xmm + i + 3, x3);
-		_mm_store_si128(lpad.as_xmm + i + 4, x4);
-		_mm_store_si128(lpad.as_xmm + i + 5, x5);
-		_mm_store_si128(lpad.as_xmm + i + 6, x6);
-		_mm_store_si128(lpad.as_xmm + i + 7, x7);
+	}
+	
+	x0 = _mm_load_si128(spad.as_xmm + 8);
+	x1 = _mm_load_si128(spad.as_xmm + 9);
+	x2 = _mm_load_si128(spad.as_xmm + 10);
+	x3 = _mm_load_si128(spad.as_xmm + 11);
+	
+	for(size_t i = 4; i < MEMORY / sizeof(__m128i); i += 8)
+	{
+		aes_round4(k0, x0, x1, x2, x3);
+		aes_round4(k1, x0, x1, x2, x3);
+		aes_round4(k2, x0, x1, x2, x3);
+		aes_round4(k3, x0, x1, x2, x3);
+		aes_round4(k4, x0, x1, x2, x3);
+		aes_round4(k5, x0, x1, x2, x3);
+		aes_round4(k6, x0, x1, x2, x3);
+		aes_round4(k7, x0, x1, x2, x3);
+		aes_round4(k8, x0, x1, x2, x3);
+		aes_round4(k9, x0, x1, x2, x3);
+
+		_mm_store_si128(lpad.as_xmm + i + 4, x0);
+		_mm_store_si128(lpad.as_xmm + i + 5, x1);
+		_mm_store_si128(lpad.as_xmm + i + 6, x2);
+		_mm_store_si128(lpad.as_xmm + i + 7, x3);
 	}
 }
 
