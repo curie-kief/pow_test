@@ -141,22 +141,18 @@ struct aesdata
 	}
 };
 
-inline void xor_write(cn_sptr dst, const aesdata& a, const aesdata& b)
-{
-	dst.as_uqword[0] = a.v64.x0 ^ b.v64.x0;
-	dst.as_uqword[1] = a.v64.x1 ^ b.v64.x1;
-}
-
 inline uint32_t sub_word(uint32_t key)
 {
 	return (saes_sbox[key >> 24 ] << 24)   | (saes_sbox[(key >> 16) & 0xff] << 16 ) | 
 		(saes_sbox[(key >> 8)  & 0xff] << 8  ) | saes_sbox[key & 0xff];
 }
 
+#ifdef __clang__
 inline uint32_t _rotr(uint32_t value, uint32_t amount)
 {
 	return (value >> amount) | (value << ((32 - amount) & 31));
 }
+#endif
 
 // sl_xor(a1 a2 a3 a4) = a1 (a2^a1) (a3^a2^a1) (a4^a3^a2^a1)
 inline void sl_xor(aesdata& x)
@@ -224,7 +220,7 @@ inline void aes_round8(const aesdata& key, aesdata& x0, aesdata& x1, aesdata& x2
 }
 
 template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::implode_scratchpad()
+void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -274,7 +270,7 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad()
 }
 
 template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::explode_scratchpad()
+void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -355,50 +351,64 @@ extern "C" size_t jh_hash(int, const uint8_t*, size_t databitlen, uint8_t*);
 extern "C" size_t skein_hash(int, const uint8_t*, size_t, uint8_t*);
 
 template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::hash(const void* in, size_t len, void* out)
+void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* out)
 {
 	keccak((const uint8_t *)in, len, spad.as_byte, 200);
 
-	explode_scratchpad();
+	explode_scratchpad_soft();
 	
 	uint64_t* h0 = spad.as_uqword;
 
-	aesdata ax0;
-	ax0.v64.x0 = h0[0] ^ h0[4];
-	ax0.v64.x1 = h0[1] ^ h0[5];
+	aesdata ax;
+	ax.v64.x0 = h0[0] ^ h0[4];
+	ax.v64.x1 = h0[1] ^ h0[5];
 
-	aesdata bx0;
-	bx0.v64.x0 = h0[2] ^ h0[6];
-	bx0.v64.x1 = h0[3] ^ h0[7];
+	aesdata bx;
+	bx.v64.x0 = h0[2] ^ h0[6];
+	bx.v64.x1 = h0[3] ^ h0[7];
 
-	uint64_t idx0 = h0[0] ^ h0[4];
+	aesdata cx;
+	cx.v64.x0 = 0;
+	cx.v64.x1 = 0;
 
-	for(size_t i = 0; i < ITER; i++)
+	for(size_t i = 0; i < ITER/2; i++)
 	{
-		aesdata cx;
-		cx.load(scratchpad_ptr(idx0));
-
-		aes_round(cx, ax0);
-		
-		xor_write(scratchpad_ptr(idx0), cx, bx0);
-
-		idx0 = cx.v64.x0;
-		bx0 = cx;
-		
-		cx.load(scratchpad_ptr(idx0));
-
 		uint64_t hi, lo;
-		lo = _umul128(idx0, cx.v64.x0, &hi);
+		
+		ax ^= cx;
+		cx.load(scratchpad_ptr(ax.v64.x0));
 
-		ax0.v64.x0 += hi;
-		ax0.v64.x1 += lo;
-		ax0.write(scratchpad_ptr(idx0));
+		aes_round(cx, ax);
 
-		ax0 ^= cx;
-		idx0 = ax0.v64.x0;
+		bx ^= cx;
+		bx.write(scratchpad_ptr(ax.v64.x0));
+
+		bx.load(scratchpad_ptr(cx.v64.x0));
+
+		lo = _umul128(cx.v64.x0, bx.v64.x0, &hi);
+
+		ax.v64.x0 += hi;
+		ax.v64.x1 += lo;
+		ax.write(scratchpad_ptr(cx.v64.x0));
+
+		ax ^= bx;
+		bx.load(scratchpad_ptr(ax.v64.x0));
+
+		aes_round(bx, ax);
+		
+		cx ^= bx;
+		cx.write(scratchpad_ptr(ax.v64.x0));
+
+		cx.load(scratchpad_ptr(bx.v64.x0));
+
+		lo = _umul128(bx.v64.x0, cx.v64.x0, &hi);
+
+		ax.v64.x0 += hi;
+		ax.v64.x1 += lo;
+		ax.write(scratchpad_ptr(bx.v64.x0));
 	}
 
-	implode_scratchpad();
+	implode_scratchpad_soft();
 
 	keccakf(spad.as_uqword, 24);
 
