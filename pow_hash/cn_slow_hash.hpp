@@ -2,12 +2,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
-
-#ifdef __GNUC__
-#include <mm_malloc.h>
-#else
-#include <malloc.h>
-#endif // __GNUC__
+#include <stdlib.h>
 
 // This cruft avoids casting-galore and allows us not to worry about sizeof(void*)
 union cn_sptr
@@ -30,14 +25,14 @@ class cn_slow_hash
 public:
 	cn_slow_hash()
 	{
-		lpad.as_void = _mm_malloc(MEMORY, 4096);
-		spad.as_void = _mm_malloc(200, 4096);
+		lpad.as_void = aligned_alloc(4096, MEMORY);
+		spad.as_void = aligned_alloc(4096, 4096);
 	}
 
 	~cn_slow_hash()
 	{
-		_mm_free(lpad.as_void);
-		_mm_free(spad.as_void);
+		free(lpad.as_void);
+		free(spad.as_void);
 	}
 
 	void hash(const void* in, size_t len, void* out);
