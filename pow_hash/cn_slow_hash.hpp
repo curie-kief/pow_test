@@ -35,7 +35,7 @@ public:
 		free(spad.as_void);
 	}
 
-	void hash(const void* in, size_t len, void* out);
+	void software_hash(const void* in, size_t len, void* out);
 
 private:
 	static constexpr size_t MASK = ((MEMORY-1) >> 4) << 4;

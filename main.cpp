@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 	cn_slow_hash<2*1024*1024, 0x80000> test;
 
 	for(size_t i=0; i < 500; i++)
-		test.hash("", 0, hash);
+		test.software_hash("", 0, hash);
 
 	if(memcmp(hash, correct, 32) == 0)
 		printf("Hash verified!\n");
