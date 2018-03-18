@@ -141,22 +141,18 @@ struct aesdata
 	}
 };
 
-inline void xor_write(cn_sptr dst, const aesdata& a, const aesdata& b)
-{
-	dst.as_uqword[0] = a.v64.x0 ^ b.v64.x0;
-	dst.as_uqword[1] = a.v64.x1 ^ b.v64.x1;
-}
-
 inline uint32_t sub_word(uint32_t key)
 {
 	return (saes_sbox[key >> 24 ] << 24)   | (saes_sbox[(key >> 16) & 0xff] << 16 ) | 
 		(saes_sbox[(key >> 8)  & 0xff] << 8  ) | saes_sbox[key & 0xff];
 }
 
+#ifdef __clang__
 inline uint32_t _rotr(uint32_t value, uint32_t amount)
 {
 	return (value >> amount) | (value << ((32 - amount) & 31));
 }
+#endif
 
 // sl_xor(a1 a2 a3 a4) = a1 (a2^a1) (a3^a2^a1) (a4^a3^a2^a1)
 inline void sl_xor(aesdata& x)
@@ -224,7 +220,7 @@ inline void aes_round8(const aesdata& key, aesdata& x0, aesdata& x1, aesdata& x2
 }
 
 template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::implode_scratchpad()
+void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -274,7 +270,7 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad()
 }
 
 template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::explode_scratchpad()
+void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -359,7 +355,7 @@ void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* 
 {
 	keccak((const uint8_t *)in, len, spad.as_byte, 200);
 
-	explode_scratchpad();
+	explode_scratchpad_soft();
 	
 	uint64_t* h0 = spad.as_uqword;
 
@@ -394,7 +390,7 @@ void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* 
 		ax.v64.x0 += hi;
 		ax.v64.x1 += lo;
 		ax.write(scratchpad_ptr(cx.v64.x0));
-		
+
 		ax ^= bx;
 		bx.load(scratchpad_ptr(ax.v64.x0));
 
@@ -412,7 +408,7 @@ void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* 
 		ax.write(scratchpad_ptr(bx.v64.x0));
 	}
 
-	implode_scratchpad();
+	implode_scratchpad_soft();
 
 	keccakf(spad.as_uqword, 24);
 
