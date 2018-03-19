@@ -204,6 +204,18 @@ extern "C" void groestl(const uint8_t*, uint64_t, uint8_t*);
 extern "C" size_t jh_hash(int, const uint8_t*, size_t databitlen, uint8_t*);
 extern "C" size_t skein_hash(int, const uint8_t*, size_t, uint8_t*);
 
+inline uint64_t xmm_extract_64(__m128i x)
+{
+#ifdef BUILD32
+	uint64_t r = _mm_cvtsi128_si32(_mm_srli_si128((x), 4));
+	r <<= 32;
+	r |= _mm_cvtsi128_si32(x);
+	return r;
+#else
+	return _mm_cvtsi128_si64(x);
+#endif
+}
+
 template<size_t MEMORY, size_t ITER>
 void cn_slow_hash<MEMORY,ITER>::hardware_hash(const void* in, size_t len, void* out)
 {
@@ -228,7 +240,7 @@ void cn_slow_hash<MEMORY,ITER>::hardware_hash(const void* in, size_t len, void* 
 		cx = _mm_aesenc_si128(cx, _mm_set_epi64x(ah0, al0));
 
 		_mm_store_si128(scratchpad_ptr(idx0).as_xmm, _mm_xor_si128(bx0, cx));
-		idx0 = _mm_cvtsi128_si64(cx);
+		idx0 = xmm_extract_64(cx);
 		bx0 = cx;
 
 		uint64_t hi, lo, cl, ch;
