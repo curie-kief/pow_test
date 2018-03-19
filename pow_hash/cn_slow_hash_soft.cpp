@@ -147,10 +147,15 @@ inline uint32_t sub_word(uint32_t key)
 		(saes_sbox[(key >> 8)  & 0xff] << 8  ) | saes_sbox[key & 0xff];
 }
 
-#if defined(__clang__) || (defined(__arm__) && defined(BUILD32))
-inline uint32_t _rotr(uint32_t value, uint32_t amount)
+#if defined(__clang__) || defined(__arm__)
+inline uint32_t rotr(uint32_t value, uint32_t amount)
 {
 	return (value >> amount) | (value << ((32 - amount) & 31));
+}
+#else
+inline uint32_t rotr(uint32_t value, uint32_t amount)
+{
+	return _rotr(value, amount);
 }
 #endif
 
@@ -166,7 +171,7 @@ template<uint8_t rcon>
 inline void soft_aes_genkey_sub(aesdata& xout0, aesdata&  xout2)
 {
 	sl_xor(xout0);
-	xout0 ^= _rotr(sub_word(xout2.v32.x3), 8) ^ rcon;
+	xout0 ^= rotr(sub_word(xout2.v32.x3), 8) ^ rcon;
 	sl_xor(xout2);
 	xout2 ^= sub_word(xout0.v32.x3);
 }
