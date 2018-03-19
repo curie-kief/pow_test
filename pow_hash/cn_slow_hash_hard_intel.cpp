@@ -20,7 +20,6 @@ inline __m128i sl_xor(__m128i tmp1)
 	return tmp1;
 }
 
-
 template<uint8_t rcon>
 inline void aes_genkey_sub(__m128i& xout0, __m128i& xout2)
 {
@@ -207,9 +206,9 @@ extern "C" size_t skein_hash(int, const uint8_t*, size_t, uint8_t*);
 inline uint64_t xmm_extract_64(__m128i x)
 {
 #ifdef BUILD32
-	uint64_t r = _mm_cvtsi128_si32(_mm_srli_si128((x), 4));
+	uint64_t r = uint32_t(_mm_cvtsi128_si32(_mm_shuffle_epi32(x, _MM_SHUFFLE(1,1,1,1))));
 	r <<= 32;
-	r |= _mm_cvtsi128_si32(x);
+	r |= uint32_t(_mm_cvtsi128_si32(x));
 	return r;
 #else
 	return _mm_cvtsi128_si64(x);

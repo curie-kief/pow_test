@@ -15,11 +15,15 @@
 #pragma GCC target ("aes")
 #define HAS_INTEL_HW
 #endif
-#ifdef _MSC_VER
-#include <malloc.h> 
+#ifdef _MSC_VER 
 #include <intrin.h>
 #define HAS_INTEL_HW
 #endif
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <malloc.h>
+#define WIN_MEM_ALIGN
 #endif
 
 #ifdef HAS_INTEL_HW
@@ -86,7 +90,7 @@ class cn_slow_hash
 public:
 	cn_slow_hash()
 	{
-#if !defined(_MSC_VER)
+#if !defined(WIN_MEM_ALIGN)
 		lpad.as_void = aligned_alloc(4096, MEMORY);
 		spad.as_void = aligned_alloc(4096, 4096);
 #else
@@ -97,7 +101,7 @@ public:
 
 	~cn_slow_hash()
 	{
-#if !defined(_MSC_VER)
+#if !defined(WIN_MEM_ALIGN)
 		free(lpad.as_void);
 		free(spad.as_void);
 #else
