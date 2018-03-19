@@ -147,7 +147,7 @@ inline uint32_t sub_word(uint32_t key)
 		(saes_sbox[(key >> 8)  & 0xff] << 8  ) | saes_sbox[key & 0xff];
 }
 
-#ifdef __clang__
+#if defined(__clang__) || (defined(__arm__) && defined(BUILD32))
 inline uint32_t _rotr(uint32_t value, uint32_t amount)
 {
 	return (value >> amount) | (value << ((32 - amount) & 31));
