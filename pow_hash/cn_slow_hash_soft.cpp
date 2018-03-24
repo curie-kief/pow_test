@@ -1,5 +1,55 @@
+// Copyright (c) 2017, SUMOKOIN
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Parts of this file are originally copyright (c) 2012-2013, The Cryptonote developers
+
 #include "cn_slow_hash.hpp"
 #include "../crypto/keccak.h"
+
+/*
+AES Tables Implementation is
+---------------------------------------------------------------------------
+Copyright (c) 1998-2013, Brian Gladman, Worcester, UK. All rights reserved.
+
+The redistribution and use of this software (with or without changes)
+is allowed without the payment of fees or royalties provided that:
+
+  source code distributions include the above copyright notice, this
+  list of conditions and the following disclaimer;
+
+  binary distributions include the above copyright notice, this list
+  of conditions and the following disclaimer in their documentation.
+
+This software is provided 'as is' with no explicit or implied warranties
+in respect of its operation, including, but not limited to, correctness
+and fitness for purpose.
+---------------------------------------------------------------------------
+*/
 
 #if !defined(_LP64) && !defined(_WIN64)
 #define BUILD32
@@ -117,6 +167,20 @@ struct aesdata
 #endif
 	}
 
+	inline aesdata& operator=(const aesdata& rhs) noexcept
+	{
+#ifdef BUILD32
+		v32.x0 = rhs.v32.x0;
+		v32.x1 = rhs.v32.x1;
+		v32.x2 = rhs.v32.x2;
+		v32.x3 = rhs.v32.x3;
+#else
+		v64.x0 = rhs.v64.x0;
+		v64.x1 = rhs.v64.x1;
+#endif
+		return *this;
+	}
+
 	inline aesdata& operator^=(const aesdata& rhs) noexcept
 	{
 #ifdef BUILD32
@@ -140,6 +204,12 @@ struct aesdata
 		return *this;
 	}
 };
+
+#include <stdio.h>
+void print_v(const aesdata& x)
+{
+	printf("%.16lx%.16lx\n", x.v64.x0, x.v64.x1);
+}
 
 inline uint32_t sub_word(uint32_t key)
 {
@@ -224,8 +294,21 @@ inline void aes_round8(const aesdata& key, aesdata& x0, aesdata& x1, aesdata& x2
 	aes_round(x7, key);
 }
 
-template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_soft()
+inline void xor_shift(aesdata& x0, aesdata& x1, aesdata& x2, aesdata& x3, aesdata& x4, aesdata& x5, aesdata& x6, aesdata& x7)
+{
+	aesdata tmp = x0;
+	x0 ^= x1;
+	x1 ^= x2;
+	x2 ^= x3;
+	x3 ^= x4;
+	x4 ^= x5;
+	x5 ^= x6;
+	x6 ^= x7;
+	x7 ^= tmp;
+}
+
+template<size_t MEMORY, size_t ITER, size_t VERSION>
+void cn_slow_hash<MEMORY,ITER,VERSION>::implode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -262,6 +345,50 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_soft()
 		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
 		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
 		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+
+		if(VERSION > 0)
+			xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
+	}
+
+	for (size_t i = 0; VERSION > 0 && i < MEMORY / sizeof(uint64_t); i += 16)
+	{
+		x0.xor_load(lpad.as_uqword + i + 0);
+		x1.xor_load(lpad.as_uqword + i + 2);
+		x2.xor_load(lpad.as_uqword + i + 4);
+		x3.xor_load(lpad.as_uqword + i + 6);
+		x4.xor_load(lpad.as_uqword + i + 8);
+		x5.xor_load(lpad.as_uqword + i + 10);
+		x6.xor_load(lpad.as_uqword + i + 12);
+		x7.xor_load(lpad.as_uqword + i + 14);
+
+		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k2, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k3, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k4, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k5, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k6, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+
+		xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
+	}
+
+	for (size_t i = 0; VERSION > 0 && i < 16; i++)
+	{
+		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k2, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k3, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k4, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k5, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k6, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+
+		xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
 	}
 
 	x0.write(spad.as_uqword + 8);
@@ -274,8 +401,8 @@ void cn_slow_hash<MEMORY,ITER>::implode_scratchpad_soft()
 	x7.write(spad.as_uqword + 22);
 }
 
-template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_soft()
+template<size_t MEMORY, size_t ITER, size_t VERSION>
+void cn_slow_hash<MEMORY,ITER,VERSION>::explode_scratchpad_soft()
 {
 	aesdata x0, x1, x2, x3, x4, x5, x6, x7;
 	aesdata k0, k1, k2, k3, k4, k5, k6, k7, k8, k9;
@@ -290,6 +417,22 @@ void cn_slow_hash<MEMORY,ITER>::explode_scratchpad_soft()
 	x5.load(spad.as_uqword + 18);
 	x6.load(spad.as_uqword + 20);
 	x7.load(spad.as_uqword + 22);
+
+	for (size_t i = 0; VERSION > 0 && i < 16; i++)
+	{
+		aes_round8(k0, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k1, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k2, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k3, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k4, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k5, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k6, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k7, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k8, x0, x1, x2, x3, x4, x5, x6, x7);
+		aes_round8(k9, x0, x1, x2, x3, x4, x5, x6, x7);
+
+		xor_shift(x0, x1, x2, x3, x4, x5, x6, x7);
+	}
 
 	for (size_t i = 0; i < MEMORY / sizeof(uint64_t); i += 16)
 	{
@@ -342,21 +485,23 @@ inline uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t* p
   return product_lo;
 }
 #else
+#if !defined(HAS_WIN_INTRIN_API)
 inline uint64_t _umul128(uint64_t a, uint64_t b, uint64_t* hi)
 {
 	unsigned __int128 r = (unsigned __int128)a * (unsigned __int128)b;
 	*hi = r >> 64;
 	return (uint64_t)r;
 }
+#endif 
 #endif
 
 extern "C" void blake256_hash(uint8_t*, const uint8_t*, uint64_t);
-extern "C" void groestl(const uint8_t*, uint64_t, uint8_t*);
-extern "C" size_t jh_hash(int, const uint8_t*, size_t databitlen, uint8_t*);
-extern "C" size_t skein_hash(int, const uint8_t*, size_t, uint8_t*);
+extern "C" void groestl(const unsigned char*, unsigned long long, unsigned char*);
+extern "C" size_t jh_hash(int, const unsigned char*, unsigned long long, unsigned char*);
+extern "C" size_t skein_hash(int, const unsigned char*, size_t, unsigned char*);
 
-template<size_t MEMORY, size_t ITER>
-void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* out)
+template<size_t MEMORY, size_t ITER, size_t VERSION>
+void cn_slow_hash<MEMORY,ITER,VERSION>::software_hash(const void* in, size_t len, void* out)
 {
 	keccak((const uint8_t *)in, len, spad.as_byte, 200);
 
@@ -373,44 +518,61 @@ void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* 
 	bx.v64.x1 = h0[3] ^ h0[7];
 
 	aesdata cx;
-	cx.v64.x0 = 0;
-	cx.v64.x1 = 0;
-
+	cn_sptr idx = scratchpad_ptr(ax.v64.x0);
+	
 	for(size_t i = 0; i < ITER/2; i++)
 	{
 		uint64_t hi, lo;
-		
-		ax ^= cx;
-		cx.load(scratchpad_ptr(ax.v64.x0));
+		cx.load(idx);
 
 		aes_round(cx, ax);
 
 		bx ^= cx;
-		bx.write(scratchpad_ptr(ax.v64.x0));
-
-		bx.load(scratchpad_ptr(cx.v64.x0));
+		bx.write(idx);
+		idx = scratchpad_ptr(cx.v64.x0);
+		bx.load(idx);
 
 		lo = _umul128(cx.v64.x0, bx.v64.x0, &hi);
 
 		ax.v64.x0 += hi;
 		ax.v64.x1 += lo;
-		ax.write(scratchpad_ptr(cx.v64.x0));
+		ax.write(idx);
 
 		ax ^= bx;
-		bx.load(scratchpad_ptr(ax.v64.x0));
+		idx = scratchpad_ptr(ax.v64.x0);
+		if(VERSION > 0)
+		{
+			int64_t n  = idx.as_qword[0];
+			int32_t d  = idx.as_dword[2];
+			int64_t q = n / (d | 5);
+			idx.as_qword[0] = n ^ q;
+			idx = scratchpad_ptr(d ^ q);
+		}
+
+		bx.load(idx);
 
 		aes_round(bx, ax);
-		
-		cx ^= bx;
-		cx.write(scratchpad_ptr(ax.v64.x0));
 
-		cx.load(scratchpad_ptr(bx.v64.x0));
+		cx ^= bx;
+		cx.write(idx);
+		idx = scratchpad_ptr(bx.v64.x0);
+		cx.load(idx);
 
 		lo = _umul128(bx.v64.x0, cx.v64.x0, &hi);
 
 		ax.v64.x0 += hi;
 		ax.v64.x1 += lo;
-		ax.write(scratchpad_ptr(bx.v64.x0));
+		ax.write(idx);
+		ax ^= cx;
+		idx = scratchpad_ptr(ax.v64.x0);
+		if(VERSION > 0)
+		{
+			int64_t n  = idx.as_qword[0];
+			int32_t d  = idx.as_dword[2];
+			int64_t q = n / (d | 5);
+			idx.as_qword[0] = n ^ q;
+			idx = scratchpad_ptr(d ^ q);
+		}
 	}
 
 	implode_scratchpad_soft();
@@ -434,4 +596,5 @@ void cn_slow_hash<MEMORY,ITER>::software_hash(const void* in, size_t len, void* 
 	}
 }
 
-template class cn_slow_hash<2*1024*1024, 0x80000>;
+template class cn_slow_hash<2*1024*1024, 0x80000, 0>;
+template class cn_slow_hash<4*1024*1024, 0x40000, 1>;

@@ -1,3 +1,34 @@
+// Copyright (c) 2017, SUMOKOIN
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Parts of this file are originally copyright (c) 2014-2017, The Monero Project
+// Parts of this file are originally copyright (c) 2012-2013, The Cryptonote developers
+
 #pragma once
 
 #include <inttypes.h>
@@ -6,24 +37,23 @@
 #include <assert.h>
 #include <string.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <malloc.h>
+#include <intrin.h>
+#define HAS_WIN_INTRIN_API
+#endif
+
 // Note HAS_INTEL_HW and future HAS_ARM_HW only mean we can emit the AES instructions
 // check CPU support for the hardware AES encryption has to be done at runtime
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X86) || defined(_M_X64)
 #ifdef __GNUC__
 #include <x86intrin.h>
-#include <cpuid.h>
 #pragma GCC target ("aes")
+#if !defined(HAS_WIN_INTRIN_API)
+#include <cpuid.h>
+#endif // !defined(HAS_WIN_INTRIN_API)
+#endif // __GNUC__
 #define HAS_INTEL_HW
-#endif
-#ifdef _MSC_VER 
-#include <intrin.h>
-#define HAS_INTEL_HW
-#endif
-#endif
-
-#if defined(_WIN32) || defined(_WIN64)
-#include <malloc.h>
-#define WIN_MEM_ALIGN
 #endif
 
 #ifdef HAS_INTEL_HW
@@ -34,7 +64,7 @@ inline void cpuid(uint32_t eax, int32_t ecx, int32_t val[4])
 	val[2] = 0;
 	val[3] = 0;
 
-#ifdef _MSC_VER
+#if defined(HAS_WIN_INTRIN_API)
 	__cpuidex(val, eax, ecx);
 #else
 	__cpuid_count(eax, ecx, val[0], val[1], val[2], val[3]);
@@ -76,6 +106,7 @@ union cn_sptr
 
 	void* as_void;
 	uint8_t* as_byte;
+	uint64_t* as_qword;
 	uint64_t* as_uqword;
 	int32_t* as_dword;
 	uint32_t* as_udword;
@@ -84,13 +115,13 @@ union cn_sptr
 #endif
 };
 
-template<size_t MEMORY, size_t ITER>
+template<size_t MEMORY, size_t ITER, size_t VERSION>
 class cn_slow_hash
 {
 public:
 	cn_slow_hash()
 	{
-#if !defined(WIN_MEM_ALIGN)
+#if !defined(HAS_WIN_INTRIN_API)
 		lpad.as_void = aligned_alloc(4096, MEMORY);
 		spad.as_void = aligned_alloc(4096, 4096);
 #else
@@ -99,15 +130,30 @@ public:
 #endif
 	}
 
+	cn_slow_hash (cn_slow_hash&& other) noexcept : lpad(other.lpad.as_byte), spad(other.spad.as_byte) 
+	{
+		other.lpad.as_byte = nullptr;
+		other.spad.as_byte = nullptr;
+	}
+	
+	cn_slow_hash& operator= (cn_slow_hash&& other) noexcept
+    {
+		if(this == &other)
+			return *this;
+
+		free_mem();
+		lpad.as_byte = other.lpad.as_byte;
+		spad.as_byte = spad.as_byte;
+		return *this;
+	}
+
+	// Copying is going to be really inefficient
+	cn_slow_hash(const cn_slow_hash& other) = delete;
+	cn_slow_hash& operator= (const cn_slow_hash& other) = delete;
+
 	~cn_slow_hash()
 	{
-#if !defined(WIN_MEM_ALIGN)
-		free(lpad.as_void);
-		free(spad.as_void);
-#else
-		_aligned_free(lpad.as_void);
-		_aligned_free(spad.as_void);
-#endif		
+		free_mem();
 	}
 
 	void hash(const void* in, size_t len, void* out)
@@ -142,6 +188,23 @@ private:
 			return true;
 		}
 	}
+	
+	inline void free_mem()
+	{
+#if !defined(HAS_WIN_INTRIN_API)
+		if(lpad.as_void != nullptr)
+			free(lpad.as_void);
+		if(lpad.as_void != nullptr)
+			free(spad.as_void);
+#else
+		if(lpad.as_void != nullptr)
+			_aligned_free(lpad.as_void);
+		if(lpad.as_void != nullptr)
+			_aligned_free(spad.as_void);
+#endif
+		lpad.as_void = nullptr;
+		spad.as_void = nullptr;
+	}
 
 	inline cn_sptr scratchpad_ptr(uint32_t idx) { return lpad.as_byte + (idx & MASK); }
 
@@ -159,3 +222,10 @@ private:
 	cn_sptr lpad;
 	cn_sptr spad;
 };
+
+using cn_pow_hash_v1 = cn_slow_hash<2*1024*1024, 0x80000, 0>;
+using cn_pow_hash_v2 = cn_slow_hash<4*1024*1024, 0x40000, 1>;
+
+extern template class cn_slow_hash<2*1024*1024, 0x80000, 0>;
+extern template class cn_slow_hash<4*1024*1024, 0x40000, 1>;
+

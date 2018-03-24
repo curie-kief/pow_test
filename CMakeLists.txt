@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.6)
 project(slow_hash)
 
+find_package( Threads )
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -14,3 +16,5 @@ file(GLOB SRCFILES *.cpp pow_hash/*.cpp crypto/*.c)
 add_executable(slow_hash "${SRCFILES}")
 
 install(TARGETS slow_hash RUNTIME DESTINATION bin)
+
+target_link_libraries( slow_hash ${CMAKE_THREAD_LIBS_INIT} )
