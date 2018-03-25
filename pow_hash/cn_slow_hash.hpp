@@ -209,9 +209,9 @@ private:
 		if(lpad.as_void() != nullptr)
 			free(spad.as_void());
 #else
-		if(lpad.as_void != nullptr)
+		if(lpad.as_void() != nullptr)
 			_aligned_free(lpad.as_void());
-		if(lpad.as_void != nullptr)
+		if(lpad.as_void() != nullptr)
 			_aligned_free(spad.as_void());
 #endif
 		lpad.set(nullptr);
