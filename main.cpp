@@ -9,20 +9,30 @@ int main(int argc, char **argv)
 		0x6f, 0xfe, 0x93, 0xf2, 0x86, 0x84, 0x52, 0x24, 0x07, 0x20, 0x60, 0x7b, 0x14, 0x38, 0x7e, 0x11}; 
 	const uint8_t correct2[32] = { 0x80, 0x47, 0x42, 0xcb, 0x8f, 0x59, 0xd8, 0x44, 0x6b, 0xc3, 0xc7, 0xc4, 0x39, 0x51, 0x4e, 0xc1,
 		0xb8, 0xff, 0xce, 0x73, 0x4e, 0xc1, 0x43, 0xcc, 0x28, 0xa6, 0x83, 0x50, 0x75, 0xdc, 0x21, 0xcd };
-	
-	cn_slow_hash<2*1024*1024, 0x80000, 0> v1;
-	cn_slow_hash<4*1024*1024, 0x40000, 1> v2;
 
-	v1.hash("", 0, hash);
-	if(memcmp(hash, correct1, 32) == 0)
-		printf("Hash A verified!\n");
+	cn_pow_hash_v2 v2;
+	v2.hash("", 0, hash);
+	if(memcmp(hash, correct2, 32) == 0)
+		printf("Hash B verified!\n");
 	else
-		printf("Hash A FAILED!\n");
+		printf("Hash B FAILED!\n");
+
+	for(size_t i=0; i < 3; i++)
+	{
+		cn_pow_hash_v1 v1 = cn_pow_hash_v1::make_borrowed(v2);
+		
+		v1.hash("", 0, hash);
+		if(memcmp(hash, correct1, 32) == 0)
+			printf("Hash A verified!\n");
+		else
+			printf("Hash A FAILED!\n");
+	}
 
 	v2.hash("", 0, hash);
 	if(memcmp(hash, correct2, 32) == 0)
 		printf("Hash B verified!\n");
 	else
 		printf("Hash B FAILED!\n");
+	
     return 0;
 }

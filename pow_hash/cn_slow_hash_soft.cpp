@@ -462,7 +462,6 @@ extern "C" void groestl(const unsigned char*, unsigned long long, unsigned char*
 extern "C" size_t jh_hash(int, const unsigned char*, unsigned long long, unsigned char*);
 extern "C" size_t skein_hash(int, const unsigned char*, size_t, unsigned char*);
 
-#include <stdio.h>
 template<size_t MEMORY, size_t ITER, size_t VERSION>
 void cn_slow_hash<MEMORY,ITER,VERSION>::software_hash(const void* in, size_t len, void* out)
 {

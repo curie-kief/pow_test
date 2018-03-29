@@ -127,11 +127,15 @@ private:
 	void* base_ptr;
 };
 
+template<size_t MEMORY, size_t ITER, size_t VERSION> class cn_slow_hash;
+using cn_pow_hash_v1 = cn_slow_hash<2*1024*1024, 0x80000, 0>;
+using cn_pow_hash_v2 = cn_slow_hash<4*1024*1024, 0x40000, 1>;
+
 template<size_t MEMORY, size_t ITER, size_t VERSION>
 class cn_slow_hash
 {
 public:
-	cn_slow_hash()
+	cn_slow_hash() : borrowed_pad(false)
 	{
 #if !defined(HAS_WIN_INTRIN_API)
 		lpad.set(aligned_alloc(4096, MEMORY));
@@ -142,12 +146,19 @@ public:
 #endif
 	}
 
-	cn_slow_hash (cn_slow_hash&& other) noexcept : lpad(other.lpad.as_byte()), spad(other.spad.as_byte()) 
+	cn_slow_hash (cn_slow_hash&& other) noexcept : lpad(other.lpad.as_byte()), spad(other.spad.as_byte()), borrowed_pad(other.borrowed_pad)
 	{
 		other.lpad.set(nullptr);
 		other.spad.set(nullptr);
 	}
-	
+
+	// Factory function enabling to temporaliy turn v2 object into v1
+	// It is caller's responsibility to ensure that v2 object is not hashing at the same time!!
+	static cn_pow_hash_v1 make_borrowed(cn_pow_hash_v2& t)
+	{
+		return cn_pow_hash_v1(t.lpad.as_void(), t.spad.as_void());
+	}
+
 	cn_slow_hash& operator= (cn_slow_hash&& other) noexcept
     {
 		if(this == &other)
@@ -156,6 +167,7 @@ public:
 		free_mem();
 		lpad.set(other.lpad.as_void());
 		spad.set(other.spad.as_void());
+		borrowed_pad = other.borrowed_pad;
 		return *this;
 	}
 
@@ -186,6 +198,16 @@ public:
 
 private:
 	static constexpr size_t MASK = ((MEMORY-1) >> 4) << 4;
+	friend cn_pow_hash_v1;
+	friend cn_pow_hash_v2;
+
+	// Constructor enabling v1 hash to borrow v2's buffer
+	cn_slow_hash(void* lptr, void* sptr)
+	{
+		lpad.set(lptr);
+		spad.set(sptr);
+		borrowed_pad = true;
+	}
 
 	inline bool check_override()
 	{
@@ -200,20 +222,24 @@ private:
 			return true;
 		}
 	}
-	
+
 	inline void free_mem()
 	{
+		if(!borrowed_pad)
+		{
 #if !defined(HAS_WIN_INTRIN_API)
-		if(lpad.as_void() != nullptr)
-			free(lpad.as_void());
-		if(lpad.as_void() != nullptr)
-			free(spad.as_void());
+			if(lpad.as_void() != nullptr)
+				free(lpad.as_void());
+			if(lpad.as_void() != nullptr)
+				free(spad.as_void());
 #else
-		if(lpad.as_void() != nullptr)
-			_aligned_free(lpad.as_void());
-		if(lpad.as_void() != nullptr)
-			_aligned_free(spad.as_void());
+			if(lpad.as_void() != nullptr)
+				_aligned_free(lpad.as_void());
+			if(lpad.as_void() != nullptr)
+				_aligned_free(spad.as_void());
 #endif
+		}
+
 		lpad.set(nullptr);
 		spad.set(nullptr);
 	}
@@ -233,10 +259,8 @@ private:
 
 	cn_sptr lpad;
 	cn_sptr spad;
+	bool borrowed_pad;
 };
-
-using cn_pow_hash_v1 = cn_slow_hash<2*1024*1024, 0x80000, 0>;
-using cn_pow_hash_v2 = cn_slow_hash<4*1024*1024, 0x40000, 1>;
 
 extern template class cn_slow_hash<2*1024*1024, 0x80000, 0>;
 extern template class cn_slow_hash<4*1024*1024, 0x40000, 1>;
