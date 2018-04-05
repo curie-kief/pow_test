@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <boost/align/aligned_alloc.hpp>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <malloc.h>

@@ -9,8 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
-set(CMAKE_CXX_FLAGS "-O3")
-set(CMAKE_C_FLAGS "-O3")
+set(CMAKE_CXX_FLAGS "-O3 -maes")
+set(CMAKE_C_FLAGS "-O3 -maes")
 
 file(GLOB SRCFILES *.cpp pow_hash/*.cpp crypto/*.c)
 add_executable(slow_hash "${SRCFILES}")
