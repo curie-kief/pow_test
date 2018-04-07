@@ -104,7 +104,7 @@ and fitness for purpose.
 #define saes_u3(p)   saes_b2w(         p,          p, saes_f3(p), saes_f2(p))
 
 alignas(16) const uint32_t saes_table[4][256] = { saes_data(saes_u0), saes_data(saes_u1), saes_data(saes_u2), saes_data(saes_u3) };
-alignas(16) const uint8_t  saes_sbox[256] = saes_data(saes_h0);
+alignas(16) extern const uint8_t  saes_sbox[256] = saes_data(saes_h0);
 
 struct aesdata
 {
