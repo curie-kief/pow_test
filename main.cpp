@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 		0xb8, 0xff, 0xce, 0x73, 0x4e, 0xc1, 0x43, 0xcc, 0x28, 0xa6, 0x83, 0x50, 0x75, 0xdc, 0x21, 0xcd };
 
 	cn_pow_hash_v2 v2;
-	v2.hardware_hash("", 0, hash);
+	v2.hash("", 0, hash);
 	if(memcmp(hash, correct2, 32) == 0)
 		printf("Hash B verified!\n");
 	else
@@ -21,14 +21,14 @@ int main(int argc, char **argv)
 	{
 		cn_pow_hash_v1 v1 = cn_pow_hash_v1::make_borrowed(v2);
 		
-		v1.hardware_hash("", 0, hash);
+		v1.hash("", 0, hash);
 		if(memcmp(hash, correct1, 32) == 0)
 			printf("Hash A verified!\n");
 		else
 			printf("Hash A FAILED!\n");
 	}
 
-	v2.hardware_hash("", 0, hash);
+	v2.hash("", 0, hash);
 	if(memcmp(hash, correct2, 32) == 0)
 		printf("Hash B verified!\n");
 	else
