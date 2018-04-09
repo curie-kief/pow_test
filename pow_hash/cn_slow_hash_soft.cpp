@@ -506,6 +506,11 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::software_hash(const void* in, size_t len
 		{
 			int64_t n  = idx.as_qword(0);
 			int32_t d  = idx.as_dword(2);
+
+#if defined(__arm__)
+			asm volatile ("nop"); //Fix for RasPi3 ARM - maybe needed on armv8 
+#endif
+
 			int64_t q = n / (d | 5);
 			idx.as_qword(0) = n ^ q;
 			idx = scratchpad_ptr(d ^ q);
@@ -531,6 +536,11 @@ void cn_slow_hash<MEMORY,ITER,VERSION>::software_hash(const void* in, size_t len
 		{
 			int64_t n  = idx.as_qword(0); // read bytes 0 - 7
 			int32_t d  = idx.as_dword(2); // read bytes 8 - 11
+
+#if defined(__arm__)
+			asm volatile ("nop"); //Fix for RasPi3 ARM - maybe needed on armv8 
+#endif
+
 			int64_t q = n / (d | 5);
 			idx.as_qword(0) = n ^ q;
 			idx = scratchpad_ptr(d ^ q);
