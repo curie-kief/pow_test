@@ -2,6 +2,11 @@
 #include <string.h>
 #include "pow_hash/cn_slow_hash.hpp"
 
+extern "C" void blake256_hash(uint8_t*, const uint8_t*, uint64_t);
+extern "C" void groestl(const unsigned char*, unsigned long long, unsigned char*);
+extern "C" size_t jh_hash(int, const unsigned char*, unsigned long long, unsigned char*);
+extern "C" size_t skein_hash(int, const unsigned char*, size_t, unsigned char*);
+
 int main(int argc, char **argv) 
 {
 	uint8_t hash[32];
@@ -34,5 +39,36 @@ int main(int argc, char **argv)
 	else
 		printf("Hash B FAILED!\n");
 	
-    return 0;
+
+	uint8_t msg[200];
+	for(uint8_t i=0; i < 200; i++)
+		msg[i] = i;
+	
+
+	blake256_hash(hash, msg, 200);
+
+	if(memcmp(hash, "\xc4\xd9\x44\xc2\xb1\xc0\x0a\x8e\xe6\x27\x72\x6b\x35\xd4\xcd\x7f\xe0\x18\xde\x09\x0b\xc6\x37\x55\x3c\xc7\x82\xe2\x5f\x97\x4c\xba", 32) == 0)
+		printf("blake256_hash verified!\n");
+	else
+		printf("blake256_hash FAILED!\n");
+
+	groestl(msg, 200 * 8, hash);
+	if(memcmp(hash, "\x5e\x48\x74\x94\x12\x76\xba\xcd\x43\xcf\x9f\x50\x78\xa5\xd6\x20\x14\x3b\x0b\x10\x5f\x63\x3f\x44\xd6\x5e\xd1\x3d\x27\xf6\xa8\x49", 32) == 0)
+		printf("groestl verified!\n");
+	else
+		printf("groestl FAILED!\n");
+
+	jh_hash(32 * 8, msg, 8 * 200, hash);
+	if(memcmp(hash, "\x4a\xe8\xdb\xb5\xad\x87\x64\x0f\xf6\x6f\x12\x53\x80\xd2\x5d\x3c\x69\x14\x64\xd9\x69\x0e\xaa\x2d\xf5\x77\xe5\xfe\x11\xc7\xb7\x6b", 32) == 0)
+		printf("jh_hash verified!\n");
+	else
+		printf("jh_hash FAILED!\n");
+
+	skein_hash(8 * 32, msg, 8 * 200, hash);
+	if(memcmp(hash, "\x44\x69\x61\x76\x82\xc7\x66\x62\x7a\xa0\x83\x84\xcb\x41\x50\x2a\x02\x88\xc7\x11\xa6\xcc\x15\xc1\xa5\xf8\x01\x63\x10\xe5\xb5\x52", 32) == 0)
+		printf("skein_hash verified!\n");
+	else
+		printf("skein_hash FAILED!\n");
+    
+	return 0;
 }
